@@ -8,8 +8,8 @@ from typing import List, Dict, Any
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from openai import OpenAI
-
+import urllib.request
+import urllib.error
 app = FastAPI(title="AI CAT SOLVER")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -95,24 +95,49 @@ async def solve(file: UploadFile = File(...)):
     data = await file.read()
     if len(data) > 12 * 1024 * 1024:
         raise HTTPException(413, "Image is too large. Maximum size is 12 MB.")
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(503, "Cloud AI is not configured yet. Add OPENAI_API_KEY to the server environment.")
-    mime = file.content_type
-    encoded = base64.b64encode(data).decode("utf-8")
-    client = OpenAI(api_key=api_key)
-    try:
-        response = client.responses.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
-            input=[{
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": PROMPT},
-                    {"type": "input_image", "image_url": f"data:{mime};base64,{encoded}", "detail": "high"}
-                ]
-            }]
-        )
-        parsed = extract_json(response.output_text)
+    api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    raise HTTPException(503, "Add GEMINI_API_KEY to the server environment.")
+
+mime = file.content_type
+encoded = base64.b64encode(data).decode("utf-8")
+
+try:
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/"
+        "models/gemini-3.8-flash:generateContent"
+        f"?key={api_key}"
+    )
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": PROMPT},
+                {
+                    "inline_data": {
+                        "mime_type": mime,
+                        "data": encoded
+                    }
+                }
+            ]
+        }],
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
+    }
+
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+
+    with urllib.request.urlopen(request, timeout=60) as response:
+        result = json.loads(response.read().decode("utf-8"))
+
+    ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
+    parsed = extract_json(ai_text)
         grid = parsed.get("grid")
         if not isinstance(grid, list) or not grid:
             raise ValueError("The AI could not identify the board grid.")
