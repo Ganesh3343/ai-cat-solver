@@ -136,7 +136,7 @@ try:
     with urllib.request.urlopen(request, timeout=60) as response:
         result = json.loads(response.read().decode("utf-8"))
 
-            ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
+                    ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
         parsed = extract_json(ai_text)
         grid = parsed.get("grid")
         if not isinstance(grid, list) or not grid:
