@@ -126,12 +126,12 @@ class MainActivity : ComponentActivity() {
                     .build()
                 val request = Request.Builder().url(base.trimEnd('/') + "/solve").post(body).build()
                 client.newCall(request).execute().use { response ->
-                    val text = response.body?.string().orEmpty()
+                    val responseText = response.body?.string().orEmpty()
                     if (!response.isSuccessful) {
-                        val message = try { JSONObject(text).optString("detail", text) } catch (_: Exception) { text }
+                        val message = try { JSONObject(responseText).optString("detail", responseText) } catch (_: Exception) { responseText }
                         error(message.ifBlank { "Server error ${response.code}" })
                     }
-                    val json = JSONObject(text)
+                    val json = JSONObject(responseText)
                     val solution = json.getJSONArray("solution")
                     runOnUiThread {
                         resultBox.removeAllViews()
