@@ -92,58 +92,71 @@ def home():
 async def solve(file: UploadFile = File(...)):
     if file.content_type not in ("image/png", "image/jpeg", "image/webp"):
         raise HTTPException(400, "Please upload a PNG, JPG, or WEBP screenshot.")
+
     data = await file.read()
+
     if len(data) > 12 * 1024 * 1024:
         raise HTTPException(413, "Image is too large. Maximum size is 12 MB.")
+
     api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    raise HTTPException(503, "Add GEMINI_API_KEY to the server environment.")
 
-mime = file.content_type
-encoded = base64.b64encode(data).decode("utf-8")
+    if not api_key:
+        raise HTTPException(503, "Add GEMINI_API_KEY to the server environment.")
 
-try:
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/"
-        "models/gemini-3.8-flash:generateContent"
-        f"?key={api_key}"
-    )
+    mime = file.content_type
+    encoded = base64.b64encode(data).decode("utf-8")
 
-    payload = {
-        "contents": [{
-            "parts": [
-                {"text": PROMPT},
-                {
-                    "inline_data": {
-                        "mime_type": mime,
-                        "data": encoded
+    try:
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/"
+            "models/gemini-3.8-flash:generateContent"
+            f"?key={api_key}"
+        )
+
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": PROMPT},
+                    {
+                        "inline_data": {
+                            "mime_type": mime,
+                            "data": encoded
+                        }
                     }
-                }
-            ]
-        }],
-        "generationConfig": {
-            "responseMimeType": "application/json"
+                ]
+            }],
+            "generationConfig": {
+                "responseMimeType": "application/json"
+            }
         }
-    }
 
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST"
-    )
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
 
-    with urllib.request.urlopen(request, timeout=60) as response:
-        result = json.loads(response.read().decode("utf-8"))
-        ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
-        parsed = extract_json(ai_text)
-        grid = parsed.get("grid")
-        if not isinstance(grid, list) or not grid:
-            raise ValueError("The AI could not identify the board grid.")
-        solution = solve_grid(grid)
-        return {"grid": grid, "solution": solution, "notes": parsed.get("notes", ""),
-                "rows": len(grid), "columns": len(grid[0])}
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(422, str(e))
+        with urllib.request.urlopen(request, timeout=60) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
+            parsed = extract_json(ai_text)
+            grid = parsed.get("grid")
+
+            if not isinstance(grid, list) or not grid:
+                raise ValueError("The AI could not identify the board grid.")
+
+            solution = solve_grid(grid)
+
+            return {
+                "grid": grid,
+                "solution": solution,
+                "notes": parsed.get("notes", ""),
+                "rows": len(grid),
+                "columns": len(grid[0])
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(422, str(e))
