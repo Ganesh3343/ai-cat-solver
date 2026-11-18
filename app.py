@@ -143,7 +143,7 @@ try:
         solution = solve_grid(grid)
         return {"grid": grid, "solution": solution, "notes": parsed.get("notes", ""),
                 "rows": len(grid), "columns": len(grid[0])}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(422, str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(422, str(e))
